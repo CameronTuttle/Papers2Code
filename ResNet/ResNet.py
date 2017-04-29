@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import keras.backend as K
 from keras import layers, optimizers
-from keras.models import Model
 from keras.applications.imagenet_utils import _obtain_input_shape
 from keras.applications.imagenet_utils import preprocess_input
 from keras.layers import Dense, Activation, Flatten, Conv2D, MaxPool2D, AveragePooling2D, BatchNormalization, \
     ZeroPadding2D, Input
+from keras.models import Model
 
 __author__ = 'Rainer Arencibia'
 __copyright__ = 'Copyright 2017, Rainer Arencibia'
@@ -60,13 +60,13 @@ def block_with_shortcut(model, filter, stage, block, strides=2):
     return x
 
 
-class Resnet(object):
+class ResNet:
 
     def __init__(self):
-        pass
 
-    @staticmethod
-    def build_resnet(input_shape=None, num_outputs=1000, layers=None, weights_path=None, optimizer=None):
+        self.model = None
+
+    def build_resnet(self, input_shape=None, num_outputs=1000, layers=None, weights_path=None):
         """
         Args:
             input_shape: The input shape in the form (nb_rows, nb_cols, nb_channels) TensorFlow Format!!
@@ -103,33 +103,47 @@ class Resnet(object):
         x = AveragePooling2D((7, 7), strides=(1, 1), name='avg_pool')(x)
         x = Flatten()(x)
         x = Dense(units=num_outputs, activation='softmax', name='fc1000')(x)
-        model = Model(inputs=img_input, outputs=x, name='ResNet Model')
+        self.model = Model(inputs=img_input, outputs=x, name='ResNet Model')
 
         if weights_path is not None:
             model.load_weights(weights_path)
 
-        if optimizer is None:
-            optimizer = optimizers.SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
+        return self.model
 
-        model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    def compile(self, optimizer='sgd'):
+
+        optimizer_dicc = {'sgd': optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True),
+                          'rmsprop': optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0),
+                          'adagrad': optimizers.Adagrad(lr=0.01, epsilon=1e-08, decay=0.0),
+                          'adadelta': optimizers.Adadelta(lr=1.0, rho=0.95, epsilon=1e-08, decay=0.0),
+                          'adam': optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)}
+
+        model.compile(optimizer=optimizer_dicc[optimizer], loss='categorical_crossentropy', metrics=['accuracy'])
         return model
+
+    def predict(self, image_batch):
+        import numpy as np
+
+        predictions = []
+        for image in image_batch:
+            pred = model.predict(image)
+            predictions.append(pred)
+
+        return np.asarray(predictions)
 
     """ FLOPs:
     50 layers  -> 3.8 x 10^9
     101 layers -> 7.6 x 10^9
     152 layers -> 11.3 x 10^9
     """
-    @staticmethod
-    def build_resnet_50(input_shape, num_outputs, weights, opt):
-        return Resnet.build_resnet(input_shape, num_outputs, layers=[3, 4, 6, 3], weights_path=weights, optimizer=opt)
+    def build_resnet_50(self, input_shape, num_outputs, weights):
+        return self.build_resnet(input_shape, num_outputs, layers=[3, 4, 6, 3], weights_path=weights)
 
-    @staticmethod
-    def build_resnet_101(input_shape, num_outputs, weights, opt):
-        return Resnet.build_resnet(input_shape, num_outputs, layers=[3, 4, 23, 3], weights_path=weights, optimizer=opt)
+    def build_resnet_101(self, input_shape, num_outputs, weights, opt):
+        return self.build_resnet(input_shape, num_outputs, layers=[3, 4, 23, 3], weights_path=weights)
 
-    @staticmethod
-    def build_resnet_152(input_shape, num_outputs, weights, opt):
-        return Resnet.build_resnet(input_shape, num_outputs, layers=[3, 8, 36, 3], weights_path=weights, optimizer=opt)
+    def build_resnet_152(self, input_shape, num_outputs, weights, opt):
+        return self.build_resnet(input_shape, num_outputs, layers=[3, 8, 36, 3], weights_path=weights)
 
 
 def process(url='./url/2/image.jpg'):
@@ -145,10 +159,11 @@ def process(url='./url/2/image.jpg'):
 if __name__ == '__main__':
 
     img = process(url='./input/lena.png')
-    resnet = Resnet()
+    resnet = ResNet()
     model = resnet.build_resnet_50(input_shape=img[0].shape, num_outputs=1000,
-                                    weights='./weights/resnet50_weights_tf_dim_ordering_tf_kernels.h5', opt=None)
+                                    weights='./weights/resnet50_weights_tf_dim_ordering_tf_kernels.h5')
+    model.compile(optimizer='sgd')
     # './weights/resnet_v1_152.ckpt'
 
-    from Show import Show
+    from utils.Show import Show
     Show.show_predictions(model, img)
