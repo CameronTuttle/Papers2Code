@@ -2,7 +2,7 @@
 import keras.backend as K
 from keras import layers, optimizers
 from keras.models import Model
-from keras.applications.imagenet_utils import _obtain_input_shape
+from keras_applications.imagenet_utils import _obtain_input_shape
 from keras.applications.imagenet_utils import preprocess_input
 from keras.layers import Dense, Activation, Flatten, Conv2D, MaxPool2D, AveragePooling2D, BatchNormalization, \
     ZeroPadding2D, Input
@@ -33,8 +33,8 @@ class ZFNet:
             raise Exception("Input shape should be a tuple like (nb_rows, nb_cols, nb_channels)")
 
         # (227, 227, 3)
-        input_shape = _obtain_input_shape(input_shape, default_size=224, min_size=197,
-                                          data_format=K.image_data_format(), include_top=True)
+        input_shape = _obtain_input_shape(input_shape, default_size=224, min_size=197, require_flatten=True,
+                                          data_format=K.image_data_format())
         img_input = Input(shape=input_shape)
         # x = ZeroPadding2D((3, 3))(img_input)
         x = Conv2D(96, (7, 7), strides=(2, 2), name='conv1')(img_input)
@@ -47,9 +47,9 @@ class ZFNet:
         x = MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding='same', name='pool2')(x)
         x = BatchNormalization(axis=3, name='bn_conv2')(x)
 
-        x = Conv2D(512, (3, 3), strides=(1, 1), padding=1, name='conv3')(x)
-        x = Conv2D(1024, (3, 3), strides=(1, 1), padding=1, name='conv4')(x)
-        x = Conv2D(512, (3, 3), strides=(1, 1), padding=1, name='conv5')(x)
+        x = Conv2D(512, (3, 3), strides=(1, 1), padding='same', name='conv3')(x)
+        x = Conv2D(1024, (3, 3), strides=(1, 1), padding='same', name='conv4')(x)
+        x = Conv2D(512, (3, 3), strides=(1, 1), padding='same', name='conv5')(x)
         x = MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding='same', name='pool3')(x)
 
         x = Dense(units=4096)(x)
@@ -75,9 +75,8 @@ class ZFNet:
         import numpy as np
 
         predictions = []
-        for image in image_batch:
-            pred = self.model.predict(image)
-            predictions.append(pred)
+        pred = self.model.predict(image_batch)
+        predictions.extend(pred)
 
         return np.asarray(predictions)
 
